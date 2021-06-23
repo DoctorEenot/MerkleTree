@@ -111,11 +111,11 @@ class MerkleTree:
             self.__calculate_parents_hash(index)
 
 
-    def get_proof(self,data:bytes) -> Tuple[List[bytes],bool]:
+    def get_proof(self,data:bytes) -> List[bytes]:
         '''
             data - hash of actual data, that is present in tree
             raises exception KeyError if data is not present in tree
-            returns tuple(proof,is_right)
+            returns proof rout
         '''
 
         # check if hash exists 
