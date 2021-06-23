@@ -1,5 +1,6 @@
 import hashlib
-from typing import List,Set
+from typing import List,Tuple
+from RBytes import RBytes
 
 PADDING_HASH = b'0'*20
 #PADDING_HASHED_HASH = hashlib.sha256(PADDING_HASH+PADDING_HASH).digest()
@@ -32,8 +33,9 @@ class MerkleTree:
         right_child = (index*2)+2
         if right_child >= len(self.list_representation):
             return None
-        return hashlib.sha256(self.__get_node_by_index(left_child)+\
-                             self.__get_node_by_index(right_child)).digest()
+        hash_input = bytes(RBytes(self.__get_node_by_index(left_child))&\
+                            RBytes(self.__get_node_by_index(right_child)))
+        return hashlib.sha256(hash_input).digest()
 
     def __populate_tree(self,right_node:int,right_branch=True):
         
@@ -97,7 +99,7 @@ class MerkleTree:
                     raise Exception('Object: '+str(to_append)+\
                                         'already exists')
                 except KeyError:
-                    self.objects[to_append] = True
+                    self.objects[to_append] = len(self.list_representation)
             self.list_representation.append(to_append)
 
         self.__populate_tree(len(self.list_representation)-1)
@@ -108,8 +110,39 @@ class MerkleTree:
         return self.__get_node_by_index(index) == \
             self.__calculate_parents_hash(index)
 
-        
 
+    def get_proof(self,data:bytes) -> Tuple[List[bytes],bool]:
+        '''
+            data - hash of actual data, that is present in tree
+            raises exception KeyError if data is not present in tree
+            returns tuple(proof,is_right)
+        '''
+
+        # check if hash exists 
+        starting_node = self.objects[data]
+
+        to_return = []
+        while starting_node != 0:
+            if starting_node%2 == 0:
+                # if right sibling
+                to_return.append(self.list_representation[starting_node-1])
+                starting_node = (starting_node-2)//2
+            else:
+                to_return.append(self.list_representation[starting_node+1])
+                starting_node = (starting_node-1)//2
+        return to_return
+
+    def get_root(self) -> bytes:
+        return self.list_representation[0]
+
+    
+def verify_proof(data:bytes,root:bytes,proof:List[bytes]) -> bool:
+    calculated_root = hashlib.sha256(bytes(RBytes(data)&RBytes(proof[0]))).digest()
+
+    for pr in proof[1:]:
+        calculated_root = hashlib.sha256(bytes(RBytes(pr)&RBytes(calculated_root))).digest()
+
+    return calculated_root == root
 
 
 
@@ -117,4 +150,8 @@ if __name__ == '__main__':
     tree = MerkleTree()
     tree.add_objects(['123','321','4545','rfer','12f3'])
     print(tree)
+    proof = tree.get_proof(hashlib.sha256(b'123').digest())
+    verify_proof(hashlib.sha256(b'123').digest(),
+                 tree.get_root(),
+                 proof)
     input('Ended')
